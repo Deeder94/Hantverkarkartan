@@ -1627,13 +1627,16 @@ async function runRadiusSearch() {
     if (token !== state.radiusSearch.token) return;
     const panel = $('.panel-content');
     const results = $('.results-section');
-    if (panel && results) {
-      const resultBox = results.getBoundingClientRect();
+    // Desktop opens at the result list; on mobile land at the filter tools
+    // immediately above it so a new search never scrolls those controls away.
+    const focus = window.matchMedia('(max-width:760px)').matches
+      ? $('.search-box') || results
+      : results;
+    if (panel && focus) {
+      const focusBox = focus.getBoundingClientRect();
       const panelBox = panel.getBoundingClientRect();
-      // Put the result heading and at least the first result ABOVE the fold.
-      // Do not rely on smooth-scroll or hidden nested scrollers.
-      const targetTop = panel.scrollTop + resultBox.top - panelBox.top - 14;
-      if (resultBox.top > panelBox.top + 100 || resultBox.bottom > panelBox.bottom) {
+      const targetTop = panel.scrollTop + focusBox.top - panelBox.top - 14;
+      if (focusBox.top > panelBox.top + 100 || focusBox.bottom > panelBox.bottom) {
         panel.scrollTo({top: Math.max(0, targetTop), behavior: 'instant'});
       }
     }

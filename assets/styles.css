@@ -478,8 +478,8 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 .sidebar.has-search .radius-search { order: 0; }
 .sidebar.has-search .search-box { order: 1; }
 .sidebar.has-search .quick-filters { order: 2; }
-.sidebar.has-search .results-section { order: 3; }
-.sidebar.has-search .filters { order: 4; }
+.sidebar.has-search .filters { order: 3; }
+.sidebar.has-search .results-section { order: 4; }
 .sidebar.has-search .sidebar-footer { order: 5; }
 .sidebar.has-search .results-section { flex:0 0 auto; min-height:0; overflow:visible; }
 .sidebar.has-search .results {overflow:visible; max-height:none; flex:0 0 auto; }
@@ -642,10 +642,11 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
   .address-lookup[open] .address-lookup-summary::after {content:'⌃';}
   .address-lookup > label {margin-top:7px;}
   .address-lookup:not([open]) {padding-bottom:0;}
-  .sidebar.has-search .quick-filters {order:3;}
-  .sidebar.has-search .results-section {order:1;}
-  .sidebar.has-search .search-box {order:2;}
-  .sidebar.has-search .filters {order:4;}
+  /* Filters must remain ABOVE the results on mobile as well as desktop. */
+  .sidebar.has-search .search-box {order:1;}
+  .sidebar.has-search .quick-filters {order:2;}
+  .sidebar.has-search .filters {order:3;}
+  .sidebar.has-search .results-section {order:4;}
   /* The result list is a scrollable area within the one compact panel. */
   .sidebar.has-search .results-section {max-height:none;min-height:0;}
   .sidebar.has-search .results > li {contain-intrinsic-size:65px;}
