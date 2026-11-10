@@ -475,12 +475,12 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 
 /* r17.5 – keep results visible; never collapse failures into an empty list. */
 .sidebar.has-search .intro { display:none; }
-.sidebar.has-search .radius-search { order: 0; }
-.sidebar.has-search .search-box { order: 1; }
-.sidebar.has-search .quick-filters { order: 2; }
-.sidebar.has-search .filters { order: 3; }
-.sidebar.has-search .results-section { order: 4; }
-.sidebar.has-search .sidebar-footer { order: 5; }
+
+
+
+
+
+
 .sidebar.has-search .results-section { flex:0 0 auto; min-height:0; overflow:visible; }
 .sidebar.has-search .results {overflow:visible; max-height:none; flex:0 0 auto; }
 .result-feedback { padding:11px 12px; margin:3px 0 7px; border:1px solid #e4c795; border-radius:10px; background:#fff9eb; color:#65420f; font-size:.85rem; line-height:1.5; }
@@ -643,10 +643,10 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
   .address-lookup > label {margin-top:7px;}
   .address-lookup:not([open]) {padding-bottom:0;}
   /* Filters must remain ABOVE the results on mobile as well as desktop. */
-  .sidebar.has-search .search-box {order:1;}
-  .sidebar.has-search .quick-filters {order:2;}
-  .sidebar.has-search .filters {order:3;}
-  .sidebar.has-search .results-section {order:4;}
+
+
+
+
   /* The result list is a scrollable area within the one compact panel. */
   .sidebar.has-search .results-section {max-height:none;min-height:0;}
   .sidebar.has-search .results > li {contain-intrinsic-size:65px;}
@@ -735,4 +735,30 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
     text-shadow:0 1px 1px rgba(0,0,0,.35);
     white-space:nowrap;
   }
+}
+
+/* r17.13: the filter section is one DOM block BEFORE the result list.
+   This prevents mobile CSS sorting, old cache and nested scrolling from
+   pulling individual filter sections below the search results. */
+.filter-tools {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 13px;
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .sidebar .panel-content > .filter-tools {
+    order: 1;
+    gap: 9px;
+  }
+  .sidebar .panel-content > .radius-search { order: 0; }
+  .sidebar .panel-content > .results-section { order: 2; }
+  .sidebar .panel-content > .sidebar-footer { order: 3; }
+}
+@media (min-width: 761px) {
+  .sidebar .panel-content > .filter-tools { order: 1; }
+  .sidebar .panel-content > .radius-search { order: 0; }
+  .sidebar .panel-content > .results-section { order: 2; }
+  .sidebar .panel-content > .sidebar-footer { order: 3; }
 }

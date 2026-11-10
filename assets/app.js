@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=r17.11';
+import { CONFIG } from './config.js?v=r17.13';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
   CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,
@@ -1627,18 +1627,17 @@ async function runRadiusSearch() {
     if (token !== state.radiusSearch.token) return;
     const panel = $('.panel-content');
     const results = $('.results-section');
-    // Desktop opens at the result list; on mobile land at the filter tools
-    // immediately above it so a new search never scrolls those controls away.
+    // After each search, mobile panels MUST start at the filter controls.
+    // The physical DOM block precedes the result list, unlike r17.12's
+    // fragile CSS-only ordering. Desktop still prioritises the results.
     const focus = window.matchMedia('(max-width:760px)').matches
-      ? $('.search-box') || results
+      ? $('#filter-tools') || results
       : results;
     if (panel && focus) {
       const focusBox = focus.getBoundingClientRect();
       const panelBox = panel.getBoundingClientRect();
       const targetTop = panel.scrollTop + focusBox.top - panelBox.top - 14;
-      if (focusBox.top > panelBox.top + 100 || focusBox.bottom > panelBox.bottom) {
-        panel.scrollTo({top: Math.max(0, targetTop), behavior: 'instant'});
-      }
+      panel.scrollTo({top: Math.max(0, targetTop), behavior: 'instant'});
     }
   });
 

@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./assets/app-icon-192.png">
   <link rel="manifest" href="./site.webmanifest">
-  <link rel="stylesheet" href="./assets/styles.css?v=r17.12">
+  <link rel="stylesheet" href="./assets/styles.css?v=r17.13">
 </head>
 <body>
   <a class="skip-link" href="#map">Hoppa till kartan</a>
@@ -65,16 +65,19 @@
             <div id="address-results" class="address-results" aria-live="polite" hidden></div>
           </details>
         </section>
-        <section class="quick-filters" aria-label="Filtrera efter typ av hjälp">
-          <div class="section-title-row"><h2>Välj typ av hjälp <span id="category-count-tag" class="category-count-tag">13 kategorier</span></h2><button id="quick-category-toggle" class="text-button" type="button" aria-controls="quick-filter-list" aria-expanded="true">Dölj</button></div>
-          <div id="quick-filter-list" class="quick-filter-list" role="group" aria-label="Välj tjänstekategori"></div>
-        </section>
+        <!-- Filtreringen bildar ett ENDA flex-objekt före resultaten.
+             Tidigare CSS-order kunde annars ordna sektioner olika på Android. -->
+        <div id="filter-tools" class="filter-tools" role="group" aria-label="Filtrera företagsresultat">
         <section class="search-box" aria-label="Filtrera hittade företag">
           <label for="business-search">Filtrera resultaten</label>
           <div class="search-input-wrap">
             <input id="business-search" type="search" placeholder="Företagsnamn eller tjänst" autocomplete="off">
             <button id="clear-search" type="button" aria-label="Rensa textfilter">×</button>
           </div>
+        </section>
+        <section class="quick-filters" aria-label="Filtrera efter typ av hjälp">
+          <div class="section-title-row"><h2>Välj typ av hjälp <span id="category-count-tag" class="category-count-tag">13 kategorier</span></h2><button id="quick-category-toggle" class="text-button" type="button" aria-controls="quick-filter-list" aria-expanded="true">Dölj</button></div>
+          <div id="quick-filter-list" class="quick-filter-list" role="group" aria-label="Välj tjänstekategori"></div>
         </section>
         <section class="filters" aria-labelledby="filters-title">
           <div class="section-title-row">
@@ -84,6 +87,7 @@
           <div id="category-list" class="category-list" hidden></div>
           <button id="toggle-all" class="text-button" type="button" hidden>Välj alla / inga</button>
         </section>
+        </div>
         <section class="results-section" aria-labelledby="results-title">
           <div class="section-title-row result-title-row"><h2 id="results-title">Företag i området</h2><span class="count-badge" id="result-count" aria-label="Antal synliga företag">0</span><button id="reset-filters" class="text-button reset-filters" type="button" hidden>Rensa filter</button></div>
           <p id="result-total" class="results-subtitle">Sorterade efter avstånd</p>
@@ -122,6 +126,6 @@
   <noscript>Hantverkarkartan kräver JavaScript för kartan.</noscript>
   <script src="./assets/bootstrap.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/dist/pmtiles.js" crossorigin="anonymous"></script>
-  <script type="module" src="./assets/app.js?v=r17.12"></script>
+  <script type="module" src="./assets/app.js?v=r17.13"></script>
 </body>
 </html>
