@@ -668,6 +668,8 @@ function showPopup(feature, lngLat) {
       <p class="popup-source-line"><strong>Källa: Overture Maps Places.</strong> Hantverkarkartan visar uppgifterna utan egen företagsgranskning. <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera fel till Overture ↗</a></p>
       <details><summary>Mer om datakällan och urvalet</summary>${sourceInfo}</details>
     </article>`;
+  // Mobile popup is screen-bound; collapse the bottom sheet so the map and card remain usable.
+  if (window.matchMedia('(max-width:760px)').matches) setMobilePanelCollapsed(true);
   state.popup?.remove();
   state.popup = new maplibregl.Popup({closeButton:true, maxWidth:'400px', offset:14})
     .setLngLat(lngLat)
@@ -1643,6 +1645,7 @@ function bindUi() {
     const collapsed = !$('#sidebar').classList.contains('is-collapsed');
     // A manual opening or closing takes precedence over the search's automatic panel state.
     window.hkAutoCollapsedForPick = false;
+    if (!collapsed) { state.popup?.remove(); state.popup = null; }
     setMobilePanelCollapsed(collapsed);
   });
   $('#about-open').addEventListener('click', () => $('#about-dialog').showModal());
