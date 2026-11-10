@@ -55,7 +55,7 @@
             <button id="show-search-area" class="text-button" type="button" hidden>Visa hela sökområdet</button>
             <button id="clear-radius-search" class="text-button danger-text" type="button" hidden>Rensa sökning</button>
           </div>
-          <div class="address-lookup">
+          <details class="address-lookup" id="address-lookup-details" open><summary class="address-lookup-summary">Sök med adress eller ort</summary>
             <label for="address-input">Eller ange en adress / ort</label>
             <form id="address-search-form" class="address-search-form" autocomplete="off">
               <input id="address-input" type="search" maxlength="150" minlength="2" placeholder="T.ex. Storgatan 1, Säffle" aria-describedby="address-search-note">
@@ -63,7 +63,7 @@
             </form>
             <p id="address-search-note" class="address-note">Adressökningen startar först när du klickar på Hitta adress.</p>
             <div id="address-results" class="address-results" aria-live="polite" hidden></div>
-          </div>
+          </details>
         </section>
         <section class="quick-filters" aria-label="Filtrera efter typ av hjälp">
           <div class="section-title-row"><h2>Välj typ av hjälp <span id="category-count-tag" class="category-count-tag">13 kategorier</span></h2><button id="quick-category-toggle" class="text-button" type="button" aria-controls="quick-filter-list" aria-expanded="true">Dölj</button></div>

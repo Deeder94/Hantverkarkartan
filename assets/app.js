@@ -650,8 +650,15 @@ function showPopup(feature, lngLat) {
     <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera datafel ↗</a>`;
   const html = `
     <article class="popup-card">
+      <div class="popup-mobile-head"><span class="popup-mobile-grip" aria-hidden="true"></span></div>
       <div class="popup-kicker">${text(p.categoryLabel || 'Företag')}</div>
       <h2>${text(p.name)}</h2>
+      <div class="popup-mobile-summary">
+        <div class="popup-mobile-service">${text(p.subcategoryLabel || p.categoryLabel || 'Ej specificerad')}</div>
+        <div class="popup-mobile-meta"><span>${p.address ? text(p.address) : 'Adress saknas'}</span>${distance ? `<strong>${text(distance)} bort</strong>` : ''}</div>
+      </div>
+      <button class="popup-more-toggle" type="button" aria-expanded="false">Visa fler uppgifter <span aria-hidden="true">⌄</span></button>
+      <div class="popup-scroll">
       <div class="popup-overview">
         <div class="popup-key-info"><span>Typ av verksamhet</span><strong>${text(p.subcategoryLabel || p.categoryLabel || 'Ej specificerad')}</strong></div>
         ${p.entityType ? `<div class="popup-key-info"><span>Inriktning</span><strong>${text(entityTypeLabel(p.entityType))}</strong></div>` : ''}
@@ -660,17 +667,45 @@ function showPopup(feature, lngLat) {
         <div class="popup-key-info"><span>Status i källdatan</span><strong>${p.status && p.status !== 'Verksamhetsstatus saknas' ? `${text(p.status)} (ej livekontrollerat)` : 'Ej tillgänglig – kontrollera själv'}</strong></div>
       </div>
       ${secondary.length ? `<p class="popup-secondary"><strong>Andra relevanta områden:</strong> ${secondary.map(text).join(' · ')}</p>` : ''}
-      <div class="popup-actions">${website
+      <div class="popup-actions popup-actions-desktop">${website
         ? `<a href="${text(website)}" target="_blank" rel="noopener noreferrer nofollow" title="Extern webbplats från Overture, ej kontrollerad">Besök webbplats ↗</a>`
-        : '<span class="popup-no-site">Ingen webbplats angiven</span>'}</div>
+        : (mapLink ? `<a href="${text(mapLink)}" target="_blank" rel="noopener noreferrer">Visa på karta ↗</a>` : '<span class="popup-no-site">Ingen webbplats angiven</span>')}</div>
       ${extraLinks ? `<div class="popup-contact">${extraLinks}</div>` : ''}
       <p class="popup-hint"><strong>Att tänka på:</strong> detta är en kartträff, inte en rekommendation eller kvalitetskontroll. Kontrollera tjänster, behörigheter, försäkring och kontaktuppgifter före beställning.</p>
       <p class="popup-source-line"><strong>Källa: Overture Maps Places.</strong> Hantverkarkartan visar uppgifterna utan egen företagsgranskning. <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera fel till Overture ↗</a></p>
       <details><summary>Mer om datakällan och urvalet</summary>${sourceInfo}</details>
+      </div>
+      <div class="popup-actions popup-actions-mobile">${website
+        ? `<a href="${text(website)}" target="_blank" rel="noopener noreferrer nofollow" title="Extern webbplats från Overture, ej kontrollerad">Besök webbplats ↗</a>`
+        : (mapLink ? `<a href="${text(mapLink)}" target="_blank" rel="noopener noreferrer">Visa på karta ↗</a>` : '<span class="popup-no-site">Ingen webbplats angiven</span>')}</div>
     </article>`;
-  // Mobile popup is screen-bound; collapse the bottom sheet so the map and card remain usable.
-  if (window.matchMedia('(max-width:760px)').matches) setMobilePanelCollapsed(true);
+  // Mobile: keep the company card OUTSIDE the MapLibre map canvas. An anchored
+  // popup was clipped by the map/sidebar stacking contexts on real Android.
+  // Desktop retains its existing MapLibre popup behavior.
   state.popup?.remove();
+  state.popup = null;
+  if (window.matchMedia('(max-width:760px)').matches) {
+    setMobilePanelCollapsed(true);
+    const overlay = document.createElement('section');
+    overlay.className = 'mobile-company-overlay';
+    overlay.setAttribute('role', 'region');
+    overlay.setAttribute('aria-label', `Företagsinformation: ${String(p.name || 'Företag')}`);
+    overlay.innerHTML = `<button type="button" class="mobile-company-close" aria-label="Stäng företagsinformation">×</button>${html}`;
+    document.body.append(overlay);
+    const close = () => {
+      overlay.remove();
+      if (state.popup?.remove === close) state.popup = null;
+    };
+    state.popup = {remove: close};
+    overlay.querySelector('.mobile-company-close').addEventListener('click', close);
+    const more = overlay.querySelector('.popup-more-toggle');
+    more.addEventListener('click', () => {
+      const expanded = overlay.querySelector('.popup-card').classList.toggle('is-expanded');
+      more.setAttribute('aria-expanded', String(expanded));
+      more.innerHTML = expanded ? 'Visa färre uppgifter <span aria-hidden="true">⌃</span>' : 'Visa fler uppgifter <span aria-hidden="true">⌄</span>';
+    });
+    return;
+  }
   state.popup = new maplibregl.Popup({closeButton:true, maxWidth:'400px', offset:14})
     .setLngLat(lngLat)
     .setHTML(html)
@@ -726,6 +761,8 @@ function fitToRadiusResults(features) {
 
 function beginPointPicking() {
   if (!state.map) return;
+  state.popup?.remove();
+  state.popup = null;
   if (window.matchMedia('(max-width:760px)').matches) {
     window.hkAutoCollapsedForPick = !$('#sidebar').classList.contains('is-collapsed');
     setMobilePanelCollapsed(true);
@@ -1612,6 +1649,10 @@ function bindUi() {
       beginPointPicking();
     }
   });
+  const addressDetails = $('#address-lookup-details');
+  if (addressDetails) {
+    addressDetails.open = !window.matchMedia('(max-width:760px)').matches;
+  }
   $('#address-search-form').addEventListener('submit', submitAddressLookup);
   $('#address-input').addEventListener('input', () => {
     clearAddressChoices();
@@ -1640,6 +1681,10 @@ function bindUi() {
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.radiusSearch.picking) cancelPointPicking();
+    if (event.key === 'Escape' && document.querySelector('.mobile-company-overlay')) {
+      state.popup?.remove();
+      state.popup = null;
+    }
   });
   $('#panel-toggle').addEventListener('click', () => {
     const collapsed = !$('#sidebar').classList.contains('is-collapsed');

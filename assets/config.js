@@ -1,6 +1,6 @@
 export const CONFIG = Object.freeze({
   appName: 'Hantverkarkartan',
-  appVersion: '2026.11.10-r17.8-mobile',
+  appVersion: '2026.11.10-r17.9-mobileux',
   countryName: 'Sverige',
   overtureRelease: '2026-10-21.0',
   // Public launch requires a controlled same-origin range-capable PMTiles endpoint.
