@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="Hitta hantverkare, hemservice, byggvaror och utrustning nära dig. Sök direkt på kartan med Overture Places.">
+  <meta name="theme-color" content="#f7f8f3">
+  <meta name="referrer" content="no-referrer">
+  <title>Hantverkarkartan – hitta hjälp nära dig</title>
+  <link rel="preconnect" href="https://tiles.openfreemap.org" crossorigin>
+  <link rel="preconnect" href="https://tiles.overturemaps.org" crossorigin>
+  <link rel="preconnect" href="https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com" crossorigin>
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/pbf@5.1.2/+esm" crossorigin>
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@3.0.0/+esm" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@6.10.0/dist/maplibre-gl.css" crossorigin="anonymous">
+  <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
+  <link rel="apple-touch-icon" sizes="192x192" href="./assets/app-icon-192.png">
+  <link rel="manifest" href="./site.webmanifest">
+  <link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#map">Hoppa till kartan</a>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar" aria-label="Sök företag">
+      <header class="brand-row">
+        <a class="brand" href="./" aria-label="Hantverkarkartan, till kartan">
+          <img class="brand-icon" src="./assets/app-icon-192.png" width="66" height="66" alt="" aria-hidden="true">
+          <span><strong data-app-name>Hantverkarkartan</strong><small>Hjälp för hus & fastighet</small></span>
+        </a>
+        <button id="panel-toggle" class="icon-button panel-toggle" type="button" aria-label="Visa eller dölj sökpanelen" aria-expanded="true">‹</button>
+      </header>
+      <div class="panel-content">
+        <section class="intro" aria-label="Så fungerar sökningen">
+          <h1>Hitta hjälp nära dig</h1>
+          <p>Hantverkare, service och butiker för hus och fastighet – på en och samma karta.</p>
+        </section>
+        <section class="radius-search" aria-labelledby="radius-title">
+          <div class="section-title-row"><h2 id="radius-title">Sök företag</h2><span class="search-step">Steg 1 av 2</span></div>
+          <label class="radius-select-label" for="radius-select"><span>Sökavstånd</span>
+            <select id="radius-select">
+              <option value="500">500 m</option>
+              <option value="1000" selected>1 km</option>
+              <option value="2000">2 km</option>
+              <option value="5000">5 km</option>
+              <option value="10000">10 km</option>
+              <option value="20000">20 km</option>
+            </select>
+          </label>
+          <p id="radius-scale-note" class="radius-scale-note" hidden>Större sökområden kan ta längre tid att söka.</p>
+          <button id="search-map-center" class="primary-button main-search-action" type="button" disabled aria-pressed="false">
+            <span aria-hidden="true">⌖</span> Sök på kartan
+          </button>
+          <p id="radius-help" class="field-help" role="status" aria-live="polite">Tryck på knappen och välj en punkt i kartan. Sökningen startar direkt.</p>
+          <div class="map-action-row">
+            <button id="show-search-area" class="text-button" type="button" hidden>Visa hela sökområdet</button>
+            <button id="clear-radius-search" class="text-button danger-text" type="button" hidden>Rensa sökning</button>
+          </div>
+          <div class="address-lookup">
+            <label for="address-input">Eller ange en adress / ort</label>
+            <form id="address-search-form" class="address-search-form" autocomplete="off">
+              <input id="address-input" type="search" maxlength="150" minlength="2" placeholder="T.ex. Storgatan 1, Säffle" aria-describedby="address-search-note">
+              <button id="address-submit" type="submit" disabled>Hitta adress</button>
+            </form>
+            <p id="address-search-note" class="address-note">Adressökningen startar först när du klickar på Hitta adress.</p>
+            <div id="address-results" class="address-results" aria-live="polite" hidden></div>
+          </div>
+        </section>
+        <section class="quick-filters" aria-label="Filtrera efter typ av hjälp">
+          <div class="section-title-row"><h2>Välj typ av hjälp <span id="category-count-tag" class="category-count-tag">13 kategorier</span></h2><button id="quick-category-toggle" class="text-button" type="button" aria-controls="quick-filter-list" aria-expanded="true">Dölj</button></div>
+          <div id="quick-filter-list" class="quick-filter-list" role="group" aria-label="Välj tjänstekategori"></div>
+        </section>
+        <section class="search-box" aria-label="Filtrera hittade företag">
+          <label for="business-search">Filtrera resultaten</label>
+          <div class="search-input-wrap">
+            <input id="business-search" type="search" placeholder="Företagsnamn eller tjänst" autocomplete="off">
+            <button id="clear-search" type="button" aria-label="Rensa textfilter">×</button>
+          </div>
+        </section>
+        <section class="filters" aria-labelledby="filters-title">
+          <div class="section-title-row">
+            <h2 id="filters-title">Välj flera kategorier <span id="selected-category-label" class="subtle-inline">· alla valda</span></h2>
+            <button id="category-toggle" class="text-button" type="button" aria-expanded="false" aria-controls="category-list">Visa alternativ</button>
+          </div>
+          <div id="category-list" class="category-list" hidden></div>
+          <button id="toggle-all" class="text-button" type="button" hidden>Välj alla / inga</button>
+        </section>
+        <section class="results-section" aria-labelledby="results-title">
+          <div class="section-title-row result-title-row"><h2 id="results-title">Företag i området</h2><span class="count-badge" id="result-count" aria-label="Antal synliga företag">0</span><button id="reset-filters" class="text-button reset-filters" type="button" hidden>Rensa filter</button></div>
+          <p id="result-total" class="results-subtitle">Sorterade efter avstånd</p>
+          <p id="result-feedback" class="result-feedback" role="alert" hidden></p>
+          <button id="retry-results" class="text-button retry-results" type="button" hidden>Försök igen</button>
+          <details id="result-diagnostics" class="result-diagnostics" hidden><summary>Varför blev sökningen ofullständig?</summary><p id="result-diagnostics-text"></p><a href="./overture-test.html">Testa anslutningen till Overture</a></details>
+          <ul id="results" class="results" aria-live="polite"><li class="empty">Tryck <strong>Sök på kartan</strong> för att börja.</li></ul>
+          <button id="more-results" class="more-results" type="button" hidden>Visa fler företag</button>
+        </section>
+        <footer class="sidebar-footer">
+          <button id="about-open" class="text-button" type="button">Om tjänsten</button>
+          <a href="./about.html">Metod & datakällor</a>
+          <a href="./privacy.html">Integritet</a>
+          <a href="./terms.html">Villkor</a>
+        </footer>
+      </div>
+    </aside>
+    <main class="map-wrap">
+      <div id="map" aria-label="Karta över verksamheter i Sverige"></div>
+      <div id="map-status" class="map-status" role="status" aria-live="polite">Laddar karta…</div>
+      <div id="map-instruction" class="map-instruction" hidden aria-live="polite"><span class="map-instruction-dot" aria-hidden="true">+</span><strong>Välj en punkt på kartan</strong><small>Sökningen startar automatiskt</small></div>
+      <div class="map-note">Overture Places <span data-release></span> · Baskarta: OpenFreeMap / OpenStreetMap</div>
+    </main>
+  </div>
+  <dialog id="about-dialog" class="about-dialog">
+    <div class="dialog-head"><div><span class="eyebrow">Om tjänsten</span><h2>Hantverkarkartan</h2></div><button id="about-close" class="icon-button" type="button" aria-label="Stäng">×</button></div>
+    <img class="dialog-wordmark" src="./assets/brand-lockup.png" width="470" height="100" alt="Hantverkarkartan – karta, hus och hammare" loading="lazy">
+    <p>Hitta hantverkare och verksamheter för hus och fastighet. Tryck på <strong>Sök på kartan</strong>, placera punkten och få träffar inom vald radie. Du kan även söka via adress eller ort.</p>
+    <p>Välj bland 13 huvudkategorier och filtrera resultatet efter namn eller tjänst. Företagsuppgifterna kommer från Overture Maps Places. Träffarna visas efter avstånd.</p>
+    <p><strong>Inte ett företagsgodkännande.</strong> Kontrollera själv att företaget finns kvar och erbjuder rätt tjänst samt har nödvändiga behörigheter och försäkringar.</p>
+    <p>Företagsnamn, kontaktuppgifter och placeringar hämtas från Overture Maps Places. Hantverkarkartan har inget eget företagsregister och granskar inte uppgifterna manuellt. <a href="https://docs.overturemaps.org/support/" target="_blank" rel="noopener noreferrer">Fel i källdata rapporteras till Overture</a>.</p>
+    <p class="dialog-contact">Ansvarig: <strong>Robert Nord</strong> · <a href="mailto:robert_nord@outlook.com">robert_nord@outlook.com</a></p>
+    <div class="dialog-links"><a href="./about.html">Metod & datakällor</a><a href="./privacy.html">Integritet</a><a href="./terms.html">Villkor</a></div>
+    <small>Version <span data-version></span> · Places <span data-release></span></small>
+  </dialog>
+  <noscript>Hantverkarkartan kräver JavaScript för kartan.</noscript>
+  <script src="./assets/bootstrap.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/dist/pmtiles.js" crossorigin="anonymous"></script>
+  <script type="module" src="./assets/app.js"></script>
+</body>
+</html>

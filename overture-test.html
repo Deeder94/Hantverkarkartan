@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Hantverkarkartan – Overture-diagnostik</title>
+<style>body{font:15px/1.55 system-ui,Arial,sans-serif;max-width:850px;margin:32px auto;padding:0 18px;color:#16302a;background:#f7f9f7}h1{line-height:1.15}button,a.action{background:#1d5c45;color:white;border:0;border-radius:8px;padding:11px 16px;cursor:pointer;font-weight:600}button:disabled{opacity:.5}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#fff;border:1px solid #cad8d1;padding:20px;border-radius:10px;color:#223333}.hint{background:#e6f1ed;border-radius:8px;padding:10px 15px}.buttons{display:flex;gap:12px;flex-wrap:wrap}.small{font-size:13px;color:#41564e}</style>
+</head><body><h1>Overture Places – felsök sökfunktionen</h1>
+<p>Testar den del som levererar verksamhetspunkter till kartan. Den behöver inga företagsregister eller API-nycklar. <strong>Inga nycklar skrivs ut.</strong></p>
+<div class="buttons"><button id="run">Kör diagnostik</button><button id="copy" disabled>Kopiera resultat</button><a href="./">Till kartan</a></div>
+<p class="hint">Kör diagnostiken tills den är färdig. Kopiera sedan hela resultatet och skicka tillbaka det. Inga företag lagras lokalt.</p>
+<pre id="result" aria-live="polite">Klicka på ”Kör diagnostik” för att testa Overture S3, lokal reservväg, CDN och MVT-avkodning.</pre>
+<p class="small">Officiell källa: Overture Maps Places, 2026-10-21.0 (reserv 2026-09-23.1). Den lokala reservvägen läser enbart avgränsade bytes från Overtures offentliga S3-arkiv.</p>
+<script src="https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/dist/pmtiles.js"></script>
+<script type="module">
+import {CONFIG} from './assets/config.js';
+import {overtureSources, eligibleOvertureReleases} from './assets/overture-sources.js';
+import {tilesForRadius} from './assets/radius-search.js';
+const $ = id => document.getElementById(id);
+const entries = [];
+function log(label, detail='') { const line = `${new Date().toLocaleTimeString('sv-SE')} | ${label}${detail ? ' | '+detail : ''}`; entries.push(line); $('result').textContent=entries.join('\n'); }
+function limited(promise, ms=13000) { let timeout; return Promise.race([promise,new Promise((_,reject)=>timeout=setTimeout(()=>reject(new Error(`Timeout ${ms} ms`)),ms))]).finally(()=>clearTimeout(timeout)); }
+function safe(e) { return String(e?.message || e || 'okänt fel').slice(0,270); }
+async function rawRange(source) {
+  const controller=new AbortController();const t=setTimeout(()=>controller.abort(),13000);
+  try {
+    const r=await fetch(source.url,{headers:{Range:'bytes=0-16383'},signal:controller.signal,cache:'no-store'});
+    const hdr=r.headers.get('content-range') || '-';
+    if(r.status!==206) { const reason=(await r.text()).slice(0,220); throw new Error(`HTTP ${r.status} (väntade 206), Content-Range ${hdr}; ${reason}`); }
+    const bytes=await r.arrayBuffer();
+    const isPmtiles=new TextDecoder().decode(bytes.slice(0,7))==='PMTiles';
+    if(!isPmtiles) throw new Error(`HTTP 206 men PMTiles-signatur saknas (${bytes.byteLength} bytes)`);
+    return `HTTP 206, ${bytes.byteLength} bytes, signatur PMTiles`;
+  } finally {clearTimeout(t)}
+}
+async function run(){
+  $('run').disabled=true;$('copy').disabled=true;entries.length=0;
+  log('Version', CONFIG.appVersion);log('Plats', location.origin);
+  log('Arkiv', CONFIG.overtureRelease);
+  if (!window.pmtiles?.PMTiles) { log('FEL PMTiles-js','CDN-biblioteket laddades inte. Kontrollera nätverksfiltrering/jsDelivr.'); $('run').disabled=false;$('copy').disabled=false;return; }
+  const releases=eligibleOvertureReleases(CONFIG);
+  log('Tillåtna utgåvor', releases.join(', ') || 'INGA: samtliga passerat 60 dagar');
+  let success=false;
+  for(const release of releases){
+    log('TESTAR UTGÅVA', release);
+    const sources=overtureSources(CONFIG,window.location,release);
+    let working=[];
+    for(const source of sources){
+      try { const outcome=await rawRange(source); log(`OK RANGE ${source.name}`,outcome); working.push(source); }
+      catch(e){log(`FEL RANGE ${source.name}`,safe(e));}
+    }
+    if(!working.length){log('FEL UTGÅVA',`Ingen källa gav giltig PMTiles-header för ${release}`);continue;}
+    for(const source of working) {
+      try {
+        const archive=new window.pmtiles.PMTiles(source.url);
+        const header=await limited(archive.getHeader());
+        log(`OK PMTILES ${source.name}`,`utgåva ${release}, zoom ${header.minZoom}-${header.maxZoom}`);
+        const tiles=tilesForRadius([13.5046,59.3793],1000,Math.min(14,header.maxZoom),220).slice(0,12);
+        let loaded=0,empty=0;
+        let sample=null;
+        for(const tile of tiles){
+          const result=await limited(archive.getZxy(tile.z,tile.x,tile.y),15000);
+          if(result?.data?.byteLength){loaded++; if(!sample) sample=result.data;} else empty++;
+        }
+        log(`OK TILES ${source.name}`,`${loaded} med data, ${empty} tomma (Karlstad, test av ${tiles.length} tiles)`);
+        if(sample){
+          try {
+            const [pbf, vt] = await limited(Promise.all([import('https://cdn.jsdelivr.net/npm/pbf@5.1.2/+esm'),import('https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@3.0.0/+esm')]));
+            const decoded=new vt.VectorTile(new pbf.PbfReader(sample));
+            const layers=Object.keys(decoded.layers||{});
+            log(`OK MVT ${source.name}`,layers.map(key=>`${key}:${decoded.layers[key].length}`).join(', ') || 'Inga lager');
+            if(!decoded.layers?.place) throw new Error('Vektortilen saknar förväntat lager place');
+            const place=decoded.layers.place;
+            if(place.length){
+              const props=place.feature(0).properties||{};
+              log('MVT-fält',Object.keys(props).join(', ').slice(0,700));
+              if(!('taxonomy' in props) && !('basic_category' in props)) log('OBS KATEGORIER','Ingen modern taxonomy/basic_category på första platsen; verifiera mappningen.');
+            }
+          }catch(e){log(`FEL MVT ${source.name}`,safe(e));continue;}
+        }else{log(`OBS MVT ${source.name}`,'De provade tiles saknade innehåll, avkodningen kunde inte testas.');}
+        success=true;
+        log('VALD UTGÅVA',release);
+        break;
+      }catch(e){log(`FEL PMTILES/TILES ${source.name}`,safe(e));}
+    }
+    if(success)break;
+  }
+  if(!success)log('STOPP','Ingen verifierad Places-datakälla. Se RANGE/PMTILES/MVT-felen ovan.');
+  log('FÄRDIG','Kopiera resultatet ovan.'); $('run').disabled=false;$('copy').disabled=false;
+}
+$('run').onclick=run;
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(entries.join('\n'));$('copy').textContent='Kopierat!';setTimeout(()=>$('copy').textContent='Kopiera resultat',2000)}catch{window.prompt('Kopiera texten:',entries.join('\n'));}};
+</script></body></html>
