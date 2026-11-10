@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG } from './config.js?v=r17.11';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
   CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,
@@ -41,6 +41,7 @@ const state = {
   featureById: new Map(),
   popup: null,
   selectedFeatureId: null,
+  selectedDomMarker: null,
   addressLookup: { token: 0, controller: null, busy: false },
   pmtilesArchives: [],
   pmtilesHeaderPromises: [],
@@ -497,9 +498,37 @@ function syncSelectedResultCards() {
     button.setAttribute('aria-pressed', String(selected));
   });
 }
+// Keep the MapLibre source for desktop and click detection. On phones the
+// selection is ALSO rendered as a DOM Marker above the WebGL canvas; the
+// previously used canvas-only ring was missing on some physical Android GPUs.
+function syncSelectedDomMarker(feature = null) {
+  state.selectedDomMarker?.remove();
+  state.selectedDomMarker = null;
+  if (!feature || !state.map || !maplibregl?.Marker ||
+      !window.matchMedia('(max-width:760px)').matches) return;
+  const coords = feature.geometry?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2 ||
+      !coords.every(Number.isFinite)) return;
+  const properties = feature.properties || {};
+  const node = document.createElement('div');
+  node.className = 'hk-selected-map-marker';
+  node.setAttribute('role', 'img');
+  node.setAttribute('aria-label', `Valt företag: ${String(properties.name || 'Företag')}`);
+  node.style.setProperty('--selected-marker-color', String(properties.color || '#1b694c'));
+  const face = document.createElement('span');
+  face.className = 'hk-selected-map-marker-face';
+  face.textContent = String(properties.short || '•').slice(0, 3);
+  node.append(face);
+  // Do not intercept pointer events: tapping the underlying mapped company
+  // must continue to work, including when multiple businesses overlap.
+  node.style.pointerEvents = 'none';
+  state.selectedDomMarker = new maplibregl.Marker({element:node, anchor:'center'})
+    .setLngLat(coords).addTo(state.map);
+}
 function clearCompanySelection() {
   state.selectedFeatureId = null;
   state.map?.getSource('selected-craft')?.setData({type:'FeatureCollection',features:[]});
+  syncSelectedDomMarker();
   syncSelectedResultCards();
 }
 function chooseCompany(feature) {
@@ -507,6 +536,7 @@ function chooseCompany(feature) {
   if (!id) return;
   state.selectedFeatureId = id;
   state.map?.getSource('selected-craft')?.setData({type:'FeatureCollection',features:[feature]});
+  syncSelectedDomMarker(feature);
   syncSelectedResultCards();
 }
 function closeCompanyPopup() {
@@ -1460,6 +1490,9 @@ async function runRadiusSearch() {
   state.popup = null;
   state.selectedFeatureId = null;
   state.map?.getSource?.('selected-craft')?.setData({type:'FeatureCollection',features:[]});
+  // Inline reset: search coroutine is also exercised in isolation by regression tests.
+  state.selectedDomMarker?.remove();
+  state.selectedDomMarker = null;
   state.radiusSearch.busy = true;
   state.radiusSearch.partialErrors = 0;
   state.radiusSearch.sourceError = null;
@@ -1781,6 +1814,15 @@ function bindUi() {
     window.hkAutoCollapsedForPick = false;
     if (!collapsed) closeCompanyPopup();
     setMobilePanelCollapsed(collapsed);
+  });
+  // Recreate the marker if the device rotates between phone and wide layouts.
+  let markerViewportTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(markerViewportTimer);
+    markerViewportTimer = setTimeout(() => {
+      const current = state.selectedFeatureId == null ? null : state.featureById.get(state.selectedFeatureId);
+      syncSelectedDomMarker(current || null);
+    }, 180);
   });
   $('#about-open').addEventListener('click', () => $('#about-dialog').showModal());
   $('#about-close').addEventListener('click', () => $('#about-dialog').close());

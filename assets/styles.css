@@ -700,3 +700,38 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 }
 .result-card.is-map-selected .result-symbol {box-shadow:0 0 0 3px #fff, 0 0 0 5px #b97d1d;}
 .result-card.is-map-selected .result-chevron {color:#8f5907;}
+
+/* r17.11: device-independent selected pin, drawn above WebGL markers on phones. */
+@media (max-width:760px) {
+  .hk-selected-map-marker {
+    box-sizing:border-box;
+    width:54px;
+    height:54px;
+    border:4px solid #fff;
+    border-radius:50%;
+    background:#f5bf3e;
+    box-shadow:0 0 0 3px #84520c,0 3px 16px 2px rgba(35,25,6,.38);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:12;
+    pointer-events:none!important;
+  }
+  .hk-selected-map-marker-face {
+    box-sizing:border-box;
+    width:38px;
+    height:38px;
+    border:2px solid #fff;
+    border-radius:50%;
+    background:var(--selected-marker-color,#1b694c);
+    display:grid;
+    place-items:center;
+    font-size:12px;
+    font-weight:800;
+    line-height:1;
+    letter-spacing:.015em;
+    color:#fff;
+    text-shadow:0 1px 1px rgba(0,0,0,.35);
+    white-space:nowrap;
+  }
+}
