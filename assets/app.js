@@ -40,6 +40,7 @@ const state = {
   baseOvertureFeatures: [],
   featureById: new Map(),
   popup: null,
+  selectedFeatureId: null,
   addressLookup: { token: 0, controller: null, busy: false },
   pmtilesArchives: [],
   pmtilesHeaderPromises: [],
@@ -359,7 +360,35 @@ function initMap() {
       paint: {'text-color':'#ffffff'}
     });
 
-    ['craft-halo','craft-points','craft-labels'].forEach(layer => {
+    // The chosen business lives in a separate, topmost source. This is vital
+    // when Overture records share the same coordinates: the exact selected
+    // business is always distinguishable, regardless of the base pin overlap.
+    map.addSource('selected-craft', {
+      type: 'geojson', data: {type:'FeatureCollection', features:[]}
+    });
+    map.addLayer({
+      id: 'selected-craft-glow', type:'circle', source:'selected-craft',
+      paint: {'circle-radius':['interpolate',['linear'],['zoom'],12,21,18,29],
+        'circle-color':'#f5c64c','circle-opacity':0.42,'circle-blur':0.32}
+    });
+    map.addLayer({
+      id: 'selected-craft-ring', type:'circle', source:'selected-craft',
+      paint: {'circle-radius':['interpolate',['linear'],['zoom'],12,17,18,23],
+        'circle-color':'#ffffff','circle-stroke-color':'#b56c08','circle-stroke-width':3}
+    });
+    map.addLayer({
+      id: 'selected-craft-core', type:'circle', source:'selected-craft',
+      paint: {'circle-radius':['interpolate',['linear'],['zoom'],12,13,18,18],
+        'circle-color':['get','color'],'circle-stroke-color':'#ffffff','circle-stroke-width':2}
+    });
+    map.addLayer({
+      id: 'selected-craft-label', type:'symbol', source:'selected-craft',
+      layout: {'text-field':['get','short'],'text-size':11,'text-font':['Noto Sans Bold'],
+        'text-allow-overlap':true,'text-ignore-placement':true},
+      paint: {'text-color':'#ffffff'}
+    });
+
+    ['craft-halo','craft-points','craft-labels','selected-craft-glow','selected-craft-ring','selected-craft-core','selected-craft-label'].forEach(layer => {
       map.on('click', layer, onProviderClick);
       map.on('mouseenter', layer, () => { if (!state.radiusSearch.picking) map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layer, () => { if (!state.radiusSearch.picking) map.getCanvas().style.cursor = ''; });
@@ -460,9 +489,38 @@ function refitFilteredResults() {
   if (matches.length) fitToRadiusResults(matches);
   else fitToSearchArea();
 }
+function syncSelectedResultCards() {
+  document.querySelectorAll('#results .result-card').forEach(button => {
+    const selected = state.selectedFeatureId != null &&
+      String(button.dataset.id) === state.selectedFeatureId;
+    button.classList.toggle('is-map-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+  });
+}
+function clearCompanySelection() {
+  state.selectedFeatureId = null;
+  state.map?.getSource('selected-craft')?.setData({type:'FeatureCollection',features:[]});
+  syncSelectedResultCards();
+}
+function chooseCompany(feature) {
+  const id = String(feature?.id ?? '');
+  if (!id) return;
+  state.selectedFeatureId = id;
+  state.map?.getSource('selected-craft')?.setData({type:'FeatureCollection',features:[feature]});
+  syncSelectedResultCards();
+}
+function closeCompanyPopup() {
+  state.popup?.remove();
+  state.popup = null;
+  clearCompanySelection();
+}
 function applyCategoryFilter({refit = false} = {}) {
   state.resultLimit = 40;
   const filtered = filteredFeatures();
+  if (state.selectedFeatureId != null &&
+      !filtered.some(feature => String(feature.id) === state.selectedFeatureId)) {
+    closeCompanyPopup();
+  }
   updateGeoJson(filtered);
   updateResultList(filtered);
   if (refit) refitFilteredResults();
@@ -563,7 +621,7 @@ function updateResultList(features = filteredFeatures()) {
     const distance = Number.isFinite(p.distanceMeters) ? ` · ${formatDistance(p.distanceMeters)}` : '';
     const li = document.createElement('li');
     li.innerHTML = `
-      <button class="result-card" data-id="${text(feature.id)}">
+      <button class="result-card${state.selectedFeatureId === String(feature.id) ? ' is-map-selected' : ''}" data-id="${text(feature.id)}" aria-pressed="${String(state.selectedFeatureId === String(feature.id))}" aria-label="Visa ${text(p.name)} på kartan">
         <span class="result-symbol" style="--cat:${text(p.color)}">${text(p.short)}</span>
         <span class="result-copy"><strong>${text(p.name)}</strong><small class="result-meta">${text(p.subcategoryLabel || p.categoryLabel)}${distance ? `<span class="result-distance">${text(distance.replace(' · ', ''))}</span>` : ''}</small>${p.address ? `<small class="result-address">${text(p.address)}</small>` : ''}</span>
         <span class="result-chevron" aria-hidden="true">›</span>
@@ -580,17 +638,35 @@ function updateResultList(features = filteredFeatures()) {
 }
 function focusFeature(feature) {
   if (window.matchMedia('(max-width:760px)').matches) setMobilePanelCollapsed(true);
-  state.map.easeTo({center: feature.geometry.coordinates, zoom: Math.max(state.map.getZoom(), 16), duration: 500});
+  const mobile = window.matchMedia('(max-width:760px)').matches;
+  state.map.easeTo({center: feature.geometry.coordinates,
+    zoom: Math.max(state.map.getZoom(), 16),
+    ...(mobile ? {offset:[0,-Math.min(95,window.innerHeight * 0.11)]} : {}), duration:500});
   showPopup(feature, feature.geometry.coordinates);
 }
 
+// Several painted layers share the same hit area. Handle only once per click,
+// otherwise repeated popup creation could clear and reapply the selection.
+const handledProviderClicks = new WeakSet();
 function onProviderClick(event) {
   if (state.radiusSearch.picking) return;
-  const rendered = event.features?.[0];
+  const nativeEvent = event.originalEvent;
+  if (nativeEvent && handledProviderClicks.has(nativeEvent)) return;
+  const topmost = state.map?.queryRenderedFeatures?.(event.point, {
+    layers:['selected-craft-label','selected-craft-core','selected-craft-ring',
+      'selected-craft-glow','craft-labels','craft-points','craft-halo']
+  });
+  const rendered = topmost?.[0] || event.features?.[0];
   if (!rendered) return;
   const id = String(rendered.properties?.id || rendered.id || '');
   const feature = state.featureById.get(id);
-  if (feature) showPopup(feature, event.lngLat);
+  if (!feature) return;
+  if (nativeEvent) handledProviderClicks.add(nativeEvent);
+  if (window.matchMedia('(max-width:760px)').matches) {
+    state.map.easeTo({center:feature.geometry.coordinates,
+      offset:[0,-Math.min(95,window.innerHeight * 0.11)],duration:380});
+  }
+  showPopup(feature, feature.geometry.coordinates);
 }
 
 function safeWebsiteUrl(value) {
@@ -684,6 +760,7 @@ function showPopup(feature, lngLat) {
   // Desktop retains its existing MapLibre popup behavior.
   state.popup?.remove();
   state.popup = null;
+  chooseCompany(feature);
   if (window.matchMedia('(max-width:760px)').matches) {
     setMobilePanelCollapsed(true);
     const overlay = document.createElement('section');
@@ -694,7 +771,10 @@ function showPopup(feature, lngLat) {
     document.body.append(overlay);
     const close = () => {
       overlay.remove();
-      if (state.popup?.remove === close) state.popup = null;
+      if (state.popup?.remove === close) {
+        state.popup = null;
+        clearCompanySelection();
+      }
     };
     state.popup = {remove: close};
     overlay.querySelector('.mobile-company-close').addEventListener('click', close);
@@ -706,10 +786,17 @@ function showPopup(feature, lngLat) {
     });
     return;
   }
-  state.popup = new maplibregl.Popup({closeButton:true, maxWidth:'400px', offset:14})
+  const popup = new maplibregl.Popup({closeButton:true, maxWidth:'400px', offset:14})
     .setLngLat(lngLat)
     .setHTML(html)
     .addTo(state.map);
+  state.popup = popup;
+  popup.on?.('close', () => {
+    if (state.popup === popup) {
+      state.popup = null;
+      clearCompanySelection();
+    }
+  });
 }
 
 function searchPadding() {
@@ -761,8 +848,7 @@ function fitToRadiusResults(features) {
 
 function beginPointPicking() {
   if (!state.map) return;
-  state.popup?.remove();
-  state.popup = null;
+  closeCompanyPopup();
   if (window.matchMedia('(max-width:760px)').matches) {
     window.hkAutoCollapsedForPick = !$('#sidebar').classList.contains('is-collapsed');
     setMobilePanelCollapsed(true);
@@ -808,8 +894,7 @@ function onMapClick(event) {
 }
 
 function setRadiusSearchPoint(center) {
-  state.popup?.remove();
-  state.popup = null;
+  closeCompanyPopup();
   state.radiusSearch.center = center;
   state.radiusSearch.partialErrors = 0;
   state.radiusSearch.sourceError = null;
@@ -825,8 +910,7 @@ function setRadiusSearchPoint(center) {
 }
 
 function clearRadiusSearch() {
-  state.popup?.remove();
-  state.popup = null;
+  closeCompanyPopup();
   state.radiusSearch.abortController?.abort();
   state.radiusSearch.abortController = null;
   state.radiusSearch.prefetchController?.abort();
@@ -1370,6 +1454,12 @@ async function runRadiusSearch() {
   const radiusMeters = state.radiusSearch.radiusMeters;
   const searchStartedAt = performance.now();
 
+  // Reset an old selection before fetching new tiles (kept inline so the
+  // original search coroutine remains standalone and regression-testable).
+  state.popup?.remove();
+  state.popup = null;
+  state.selectedFeatureId = null;
+  state.map?.getSource?.('selected-craft')?.setData({type:'FeatureCollection',features:[]});
   state.radiusSearch.busy = true;
   state.radiusSearch.partialErrors = 0;
   state.radiusSearch.sourceError = null;
@@ -1682,15 +1772,14 @@ function bindUi() {
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.radiusSearch.picking) cancelPointPicking();
     if (event.key === 'Escape' && document.querySelector('.mobile-company-overlay')) {
-      state.popup?.remove();
-      state.popup = null;
+      closeCompanyPopup();
     }
   });
   $('#panel-toggle').addEventListener('click', () => {
     const collapsed = !$('#sidebar').classList.contains('is-collapsed');
     // A manual opening or closing takes precedence over the search's automatic panel state.
     window.hkAutoCollapsedForPick = false;
-    if (!collapsed) { state.popup?.remove(); state.popup = null; }
+    if (!collapsed) closeCompanyPopup();
     setMobilePanelCollapsed(collapsed);
   });
   $('#about-open').addEventListener('click', () => $('#about-dialog').showModal());

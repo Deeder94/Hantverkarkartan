@@ -689,3 +689,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
  .mobile-company-overlay .popup-actions-desktop {display:none;}
  .mobile-company-overlay .popup-actions-mobile {display:block;}
 }
+
+/* r17.10 – synchronised list-to-map selection on all screen sizes. */
+.result-card.is-map-selected,
+.result-card.is-map-selected:hover,
+.result-card.is-map-selected:focus-visible {
+  background:#fff7df;
+  border-color:#c78d24;
+  box-shadow:inset 4px 0 0 #bb7a18, 0 2px 9px rgba(91,65,13,.12);
+}
+.result-card.is-map-selected .result-symbol {box-shadow:0 0 0 3px #fff, 0 0 0 5px #b97d1d;}
+.result-card.is-map-selected .result-chevron {color:#8f5907;}
