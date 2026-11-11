@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=r17.14';
+import { CONFIG } from './config.js?v=r17.15';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
   CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,
@@ -142,25 +142,15 @@ function buildCategoryControls() {
       if (event.target.checked) state.selectedCategories.add(key);
       else state.selectedCategories.delete(key);
       updateCategorySelectionLabel();
-      updateQuickFilters();
-      applyCategoryFilter({refit: true});
+          applyCategoryFilter({refit: true});
     });
     container.append(label);
   }
   updateCategorySelectionLabel();
-  updateQuickFilters();
 }
 
 
 
-function setQuickCategoriesExpanded(expanded) {
-  const list = $('#quick-filter-list');
-  const button = $('#quick-category-toggle');
-  if (!list || !button) return;
-  list.hidden = !expanded;
-  button.setAttribute('aria-expanded', String(expanded));
-  button.textContent = expanded ? 'Dölj' : 'Visa alla';
-}
 function setMobilePanelCollapsed(collapsed) {
   const panel = $('#sidebar');
   const toggle = $('#panel-toggle');
@@ -171,41 +161,12 @@ function setMobilePanelCollapsed(collapsed) {
 }
 function clearAllResultFilters() {
   $('#business-search').value = '';
-  setQuickCategory('all');
-}
-
-function buildQuickFilters() {
-  const wrap = $('#quick-filter-list');
-  if (!wrap) return;
-  const options = [['all', 'Alla kategorier'], ...Object.entries(CATEGORIES).map(([key, value]) => [key, value.label])];
-  for (const [key, label] of options) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'quick-chip';
-    button.dataset.quickCategory = key;
-    button.textContent = label;
-    button.addEventListener('click', () => setQuickCategory(key));
-    wrap.append(button);
-  }
-  updateQuickFilters();
-}
-function updateQuickFilters() {
-  const all = state.selectedCategories.size === Object.keys(CATEGORIES).length;
-  document.querySelectorAll('[data-quick-category]').forEach(button => {
-    const key = button.dataset.quickCategory;
-    const active = key === 'all' ? all : state.selectedCategories.size === 1 && state.selectedCategories.has(key);
-    button.classList.toggle('is-selected', active);
-    button.setAttribute('aria-pressed', String(active));
-  });
-}
-function setQuickCategory(key) {
-  if (key !== 'all' && !Object.hasOwn(CATEGORIES, key)) return;
-  state.selectedCategories = new Set(key === 'all' ? Object.keys(CATEGORIES) : [key]);
+  // The single multi-select category menu is authoritative for every filter.
+  state.selectedCategories = new Set(Object.keys(CATEGORIES));
   document.querySelectorAll('#category-list input[type=checkbox]').forEach(input => {
-    input.checked = state.selectedCategories.has(input.value);
+    input.checked = true;
   });
   updateCategorySelectionLabel();
-  updateQuickFilters();
   applyCategoryFilter({refit: true});
 }
 
@@ -1509,7 +1470,6 @@ async function runRadiusSearch() {
   state.featureById.clear();
   $('#sidebar')?.classList.remove('has-results');
   $('#sidebar')?.classList.add('has-search');
-  if (!window.hkCategoryToggleTouched) setQuickCategoriesExpanded(false);
   updateGeoJson([]);
   updateResultList([]);
 
@@ -1621,11 +1581,6 @@ async function runRadiusSearch() {
   if (displayed.length) requestAnimationFrame(() => {
     if (token === state.radiusSearch.token) fitToRadiusResults(displayed);
   });
-  // After the FIRST complete search, prioritize readable results rather than
-  // letting 13 category chips push the list below the fold. Categories remain one tap away.
-  if (state.selectedCategories.size === Object.keys(CATEGORIES).length && !window.hkCategoryToggleTouched) {
-    setQuickCategoriesExpanded(false);
-  }
   requestAnimationFrame(() => {
     if (token !== state.radiusSearch.token) return;
     const panel = $('.panel-content');
@@ -1740,10 +1695,6 @@ function bindUi() {
     state.resultLimit = (state.resultLimit || 40) + 40;
     updateResultList(filteredFeatures());
   });
-  $('#quick-category-toggle').addEventListener('click', () => {
-    window.hkCategoryToggleTouched = true;
-    setQuickCategoriesExpanded($('#quick-filter-list').hidden);
-  });
   $('#clear-search').addEventListener('click', () => {
     $('#business-search').value = '';
     applyCategoryFilter({refit: true});
@@ -1765,8 +1716,7 @@ function bindUi() {
     inputs.forEach(i => i.checked = !allChecked);
     state.selectedCategories = new Set(!allChecked ? Object.keys(CATEGORIES) : []);
     updateCategorySelectionLabel();
-    updateQuickFilters();
-    applyCategoryFilter({refit: true});
+      applyCategoryFilter({refit: true});
   });
   $('#search-map-center').addEventListener('click', () => {
     if (state.radiusSearch.picking) {
@@ -1838,7 +1788,6 @@ window.HK_BOOT?.moduleStarted?.();
 async function boot() {
   fillStaticUi();
   buildCategoryControls();
-  buildQuickFilters();
   bindUi();
   setStatus('Laddar karta…', 'info');
   warmTileWorkerPool();
