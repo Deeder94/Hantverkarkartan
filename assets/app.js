@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=r17.16';
+import { CONFIG } from './config.js?v=r17.17';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
   CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,

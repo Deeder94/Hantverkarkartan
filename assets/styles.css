@@ -789,3 +789,14 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
   .sidebar.has-search .results-section { flex: 0 0 auto; min-height: 0; height: auto; }
   .sidebar.has-search .results { flex: 0 0 auto; min-height: 0; height: auto; }
 }
+
+/* r17.17: the mobile bottom sheet is a CLIP container, never a scroll container.
+   overflow:hidden allows programmatic scrolling of the entire sidebar on
+   Android/Chromium when a category label is focused/tapped. That scrolls the
+   header away and leaves a large white blank area although results exist.
+   Only .panel-content is scrollable. */
+@media (max-width: 760px) {
+  .sidebar { overflow: clip; }
+  .sidebar .brand-row { flex: 0 0 auto; }
+  .sidebar .panel-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+}
