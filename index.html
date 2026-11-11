@@ -35,7 +35,7 @@
           <p>Hantverkare, service och butiker för hus och fastighet – på en och samma karta.</p>
         </section>
         <section class="radius-search" aria-labelledby="radius-title">
-          <div class="section-title-row"><h2 id="radius-title">Sök företag</h2><span class="search-step">Steg 1 av 2</span></div>
+          <div class="section-title-row"><h2 id="radius-title">Sök företag</h2></div>
           <label class="radius-select-label" for="radius-select"><span>Sökavstånd</span>
             <select id="radius-select">
               <option value="500">500 m</option>
@@ -56,7 +56,7 @@
             <button id="clear-radius-search" class="text-button danger-text" type="button" hidden>Rensa sökning</button>
           </div>
           <details class="address-lookup" id="address-lookup-details" open><summary class="address-lookup-summary">Sök med adress eller ort</summary>
-            <label for="address-input">Eller ange en adress / ort</label>
+            <label for="address-input">Adress eller ort</label>
             <form id="address-search-form" class="address-search-form" autocomplete="off">
               <input id="address-input" type="search" maxlength="150" minlength="2" placeholder="T.ex. Storgatan 1, Säffle" aria-describedby="address-search-note">
               <button id="address-submit" type="submit" disabled>Hitta adress</button>
@@ -126,6 +126,6 @@
   <noscript>Hantverkarkartan kräver JavaScript för kartan.</noscript>
   <script src="./assets/bootstrap.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/dist/pmtiles.js" crossorigin="anonymous"></script>
-  <script type="module" src="./assets/app.js?v=r17.13"></script>
+  <script type="module" src="./assets/app.js?v=r17.14"></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=r17.13';
+import { CONFIG } from './config.js?v=r17.14';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
   CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,
@@ -81,7 +81,10 @@ function text(value) {
 
 function setStatus(message, kind = 'info') {
   const el = $('#map-status');
-  el.textContent = message;
+  // An idle map needs no instruction banner. Keep real progress and errors visible.
+  const value = String(message ?? '').trim();
+  el.hidden = value.length === 0;
+  el.textContent = value;
   el.dataset.kind = kind;
 }
 
@@ -396,7 +399,7 @@ function initMap() {
     });
 
     map.on('click', onMapClick);
-    setStatus('Tryck Välj plats på kartan och klicka där du vill söka.', 'info');
+    setStatus('', 'info'); // Map ready: the main search button is the sole entry point.
     window.HK_BOOT?.mapReady?.();
     // Förvärm MVT-avkodaren efter att kartan är igång. Fel här får inte slå ut kartan;
     // sökfunktionen försöker igen vid nästa punkt-/radiesökning.
@@ -891,7 +894,7 @@ function beginPointPicking() {
   button.classList.add('is-active');
   $('#radius-help').textContent = 'Klicka på valfri punkt i kartan. Sökningen startar automatiskt.';
   state.map.getCanvas().style.cursor = 'crosshair';
-  setStatus(`Klicka i kartan där sökningen ska utgå. Radie: ${formatRadius(state.radiusSearch.radiusMeters)}.`, 'info');
+  setStatus('', 'info'); // During picking, #map-instruction already gives the next action.
   // Intent-based warm-up: only after the user explicitly enters point-search
   // mode. This never displays businesses and is not triggered by pan/zoom.
   prefetchPointSearchArea().catch(() => {});
@@ -968,7 +971,7 @@ function clearRadiusSearch() {
   $('#sidebar')?.classList.remove('has-results');
   updateGeoJson([]);
   updateResultList([]);
-  setStatus('Placera en sökpunkt och välj radie för att hitta relevanta verksamheter.', 'info');
+  setStatus('', 'info'); // After clearing a search, avoid a duplicate idle instruction.
 }
 
 async function ensureMvtParser() {
