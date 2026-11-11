@@ -16,7 +16,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./assets/favicon-32.png">
   <link rel="apple-touch-icon" sizes="192x192" href="./assets/app-icon-192.png">
   <link rel="manifest" href="./site.webmanifest">
-  <link rel="stylesheet" href="./assets/styles.css?v=r17.13">
+  <link rel="stylesheet" href="./assets/styles.css?v=r17.16">
 </head>
 <body>
   <a class="skip-link" href="#map">Hoppa till kartan</a>
@@ -80,8 +80,8 @@
             <h2 id="filters-title">Välj flera kategorier <span id="selected-category-label" class="subtle-inline">· alla valda</span></h2>
             <button id="category-toggle" class="text-button" type="button" aria-expanded="false" aria-controls="category-list">Visa alternativ</button>
           </div>
+          <button id="toggle-all" class="category-select-all" type="button" hidden aria-controls="category-list" aria-label="Avmarkera alla kategorier">Avmarkera alla</button>
           <div id="category-list" class="category-list" hidden></div>
-          <button id="toggle-all" class="text-button" type="button" hidden>Välj alla / inga</button>
         </section>
         </div>
         <section class="results-section" aria-labelledby="results-title">
@@ -122,6 +122,6 @@
   <noscript>Hantverkarkartan kräver JavaScript för kartan.</noscript>
   <script src="./assets/bootstrap.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pmtiles@4.5.0/dist/pmtiles.js" crossorigin="anonymous"></script>
-  <script type="module" src="./assets/app.js?v=r17.15"></script>
+  <script type="module" src="./assets/app.js?v=r17.16"></script>
 </body>
 </html>

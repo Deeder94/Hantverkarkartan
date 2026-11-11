@@ -163,11 +163,10 @@ body.page { overflow: auto; background: #f2f3ee; }
 .results::-webkit-scrollbar-thumb { background: rgba(61, 83, 72, .45); border: 2px solid transparent; border-radius: 999px; background-clip: padding-box; }
 .results::-webkit-scrollbar-thumb:hover { background: rgba(29, 92, 69, .68); background-clip: padding-box; }
 
-/* r10: stora tätortsresultat behöver inte layoutas/målas utanför scrollens viewport. */
-.results > li {
-  content-visibility: auto;
-  contain-intrinsic-size: 58px;
-}
+/* r17.16: Never virtualize individual result cards. Android/Brave can keep
+   them unpainted when toggling categories in a nested scroll container.
+   At most 40 cards are mounted at once, so real DOM layout is inexpensive. */
+.results > li { content-visibility: visible; contain: none; }
 
 /* r15: official company enrichment + diagnostics */
 .official-company-line { border-left: 3px solid #1d5c45; padding-left: 10px; }
@@ -649,7 +648,6 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
 
   /* The result list is a scrollable area within the one compact panel. */
   .sidebar.has-search .results-section {max-height:none;min-height:0;}
-  .sidebar.has-search .results > li {contain-intrinsic-size:65px;}
   .result-card {padding:9px;min-height:62px;}
   .result-copy strong {font-size:.83rem;}
   .map-instruction {top:54px;}
@@ -761,4 +759,33 @@ button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-v
   .sidebar .panel-content > .radius-search { order: 0; }
   .sidebar .panel-content > .results-section { order: 2; }
   .sidebar .panel-content > .sidebar-footer { order: 3; }
+}
+
+/* r17.16 – reliable category interactions and scroll in mobile bottom sheet. */
+.category-select-all {
+  display: block;
+  width: 100%;
+  min-height: 46px;
+  margin: 10px 0 12px;
+  border: 1.5px solid #8bb99d;
+  border-radius: 11px;
+  background: #e9f5ed;
+  color: #145b3d;
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 780;
+  text-align: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.category-select-all:hover { background: #dceee3; }
+.category-select-all:focus-visible { outline: 3px solid #7fae8f; outline-offset: 3px; }
+.category-select-all[hidden] { display: none !important; }
+.category-select-all[data-all-selected="false"] { background: #176346; border-color: #176346; color: #fff; }
+.results > li { contain-intrinsic-size: none !important; }
+@media (max-width:760px) {
+  .sidebar .panel-content { overflow-anchor: none; }
+  .category-select-all { min-height: 51px; font-size: 1rem; margin: 8px 0 11px; }
+  .sidebar.has-search .results-section { flex: 0 0 auto; min-height: 0; height: auto; }
+  .sidebar.has-search .results { flex: 0 0 auto; min-height: 0; height: auto; }
 }

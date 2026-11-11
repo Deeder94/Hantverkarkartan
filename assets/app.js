@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js?v=r17.15';
+import { CONFIG } from './config.js?v=r17.16';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
   CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,
@@ -123,10 +123,16 @@ function fillStaticUi() {
 
 function updateCategorySelectionLabel() {
   const label = $('#selected-category-label');
-  if (!label) return;
   const total = Object.keys(CATEGORIES).length;
   const selected = state.selectedCategories.size;
-  label.textContent = selected === total ? '· alla valda' : selected === 0 ? '· inga valda' : `· ${selected} av ${total}`;
+  if (label) label.textContent = selected === total ? '· alla valda' : selected === 0 ? '· inga valda' : `· ${selected} av ${total}`;
+  const bulk = $('#toggle-all');
+  if (bulk) {
+    const all = selected === total;
+    bulk.textContent = all ? 'Avmarkera alla' : 'Välj alla';
+    bulk.setAttribute('aria-label', all ? 'Avmarkera alla kategorier' : 'Välj alla kategorier');
+    bulk.dataset.allSelected = String(all);
+  }
 }
 
 function buildCategoryControls() {
@@ -582,6 +588,11 @@ function updateResultList(features = filteredFeatures()) {
   }
 
   if (!features.length) {
+    if (state.selectedCategories.size === 0) {
+      list.innerHTML = '<li class="empty">Inga kategorier valda. Välj minst en kategori ovanför för att visa företag.</li>';
+      setStatus('Välj minst en kategori för att visa företag i området.', 'info');
+      return;
+    }
     const elapsed = Number.isFinite(state.radiusSearch.elapsedMs) ? ` · ${(state.radiusSearch.elapsedMs / 1000).toFixed(1)} s` : '';
     if (state.radiusSearch.timedOut) {
       list.innerHTML = `<li class="empty">Sökningen tog för lång tid. Inga bekräftade träffar ännu. Tryck Försök igen för att fortsätta hämta information.</li>`;
