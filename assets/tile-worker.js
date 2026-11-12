@@ -1,6 +1,6 @@
 import {
   CATEGORIES, mightMatchCategory, classifyPlaceDetailed, isUsablePlace,
-  firstWebsite, bestAddress, sourceDatasets, statusLabel, safeJson
+  firstWebsite, sourceDatasets
 } from './classifier.js';
 import { mvtPointToLngLat } from './radius-search.js';
 
@@ -24,13 +24,6 @@ async function ensureParser() {
     });
   }
   return parserPromise;
-}
-
-function addressParts(properties = {}) {
-  const addresses = safeJson(properties.addresses, []);
-  const list = Array.isArray(addresses) ? addresses : [];
-  const a = list.find(x => String(x?.country || '').toUpperCase() === 'SE') || list[0] || {};
-  return {locality:String(a?.locality || a?.city || ''), postcode:String(a?.postcode || '').replace(/\s+/g,'')};
 }
 
 function uniqueId(vectorFeature, props, coords) {
@@ -67,8 +60,6 @@ async function decodeTile(tile, buffer, minimumConfidence) {
     const category = CATEGORIES[categoryKey];
     const id = uniqueId(vectorFeature, props, coords);
     const name = props['@name'] || props.name || props.basic_category || category.label;
-    const confidence = Number(props.confidence);
-    const ap = addressParts(props);
 
     candidates.push({
       type: 'Feature', id,
@@ -85,18 +76,9 @@ async function decodeTile(tile, buffer, minimumConfidence) {
         short: category.short,
         color: category.color,
         website: firstWebsite(props),
-        address: bestAddress(props),
-        locality: ap.locality,
-        postcode: ap.postcode,
-        status: statusLabel(props),
-        confidence: Number.isFinite(confidence) ? confidence : null,
         sources: sourceDatasets(props).join(', '),
         overtureId: props.id || '',
         categoryBasis: classification?.basis || 'taxonomy',
-        categoryReason: classification?.reason || '',
-        categoryScore: Number.isFinite(Number(classification?.score)) ? Number(classification.score) : null,
-        categoryConfidence: classification?.categoryConfidence || '',
-        entityType: classification?.entityType || '',
         distanceMeters: null
       }
     });

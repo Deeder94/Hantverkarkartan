@@ -1,6 +1,8 @@
 # Third-party notices — Hantverkarkartan
 
-Release: 2026-11-09 (r17.2)
+Aktuella externa villkor och källor: [Källor och leverantörer](./providers.html). Leverantörernas egna policysidor gäller för deras aktuella villkor. Denna fil behåller nödvändiga licens- och upphovsrättsnotiser.
+
+Reference data release: Overture 2026-10-21.0
 
 ## Overture Maps Places
 
@@ -61,7 +63,7 @@ Used by `@mapbox/vector-tile` to decode Protocol Buffer data. The browser fetche
 
 ## Hantverkarkartan application code
 
-The original Hantverkarkartan code in this release is provided under the MIT License; see `LICENSE`.
+**Original application code:** Copyright © 2026 Robert Nord, to the extent of rights held by the operator. No new open-source licence is offered for the original Hantverkarkartan code by this release. A previous public notice stated that original code was provided under the MIT License, although the referenced root-level `LICENSE` file was absent. This correction does **not** revoke rights that may have been validly granted to recipients under an earlier licence. Determining the full effect of that earlier notice may require legal advice. Third-party licences and data-source terms remain unchanged.
 
 
 

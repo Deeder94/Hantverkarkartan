@@ -1,4 +1,4 @@
-import { CONFIG } from './config.js';
+import { CONFIG } from './config.js?v=source20261112';
 
 document.querySelectorAll('[data-app-name]').forEach(el => el.textContent = CONFIG.appName);
 document.querySelectorAll('[data-release]').forEach(el => el.textContent = CONFIG.overtureRelease);

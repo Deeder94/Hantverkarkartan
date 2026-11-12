@@ -1,8 +1,9 @@
-import { CONFIG } from './config.js?v=r17.17';
+import { isSuppressedListing } from './listing-suppression.js';
+import { CONFIG } from './config.js?v=r17.21';
 import { overtureSources, eligibleOvertureReleases, describeOvertureFailure } from './overture-sources.js';
 import {
-  CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite, bestAddress,
-  sourceDatasets, statusLabel, safeJson
+  CATEGORIES, mightMatchCategory, classifyPlace, classifyPlaceDetailed, isUsablePlace, firstWebsite,
+  sourceDatasets
 } from './classifier.js';
 import {
   bboxForRadius, circlePolygon, haversineMeters, tilesForRadius, mvtPointToLngLat, deadlineForRadiusSearch
@@ -95,10 +96,6 @@ function formatRadius(meters) {
 function formatDistance(meters) {
   if (!Number.isFinite(meters)) return '';
   return meters >= 1000 ? `${(meters / 1000).toFixed(meters >= 10000 ? 0 : 1)} km` : `${Math.round(meters)} m`;
-}
-
-function entityTypeLabel(type) {
-  return ({service:'Tjänsteföretag', retail:'Butik/handel', rental:'Uthyrning', consultant:'Konsult/besiktning'})[type] || '';
 }
 
 function fillStaticUi() {
@@ -387,16 +384,6 @@ function uniqueKey(feature, props) {
   return String(props.id || feature.id || `${feature.geometry?.coordinates?.join(',')}:${props['@name'] || ''}`);
 }
 
-function overtureAddressParts(properties = {}) {
-  const addresses = safeJson(properties.addresses, []);
-  const list = Array.isArray(addresses) ? addresses : [];
-  const a = list.find(x => String(x?.country || '').toUpperCase() === 'SE') || list[0] || {};
-  return {
-    locality: String(a?.locality || a?.city || ''),
-    postcode: String(a?.postcode || '').replace(/\s+/g, '')
-  };
-}
-
 function normalizeFeature(feature, distanceFrom = null, knownClassification = null) {
   const props = feature.properties || {};
   if (!knownClassification && !isUsablePlace(props, CONFIG.minimumConfidence)) return null;
@@ -411,8 +398,6 @@ function normalizeFeature(feature, distanceFrom = null, knownClassification = nu
   const category = CATEGORIES[categoryKey];
   const id = uniqueKey(feature, props);
   const name = props['@name'] || props.name || props.basic_category || category.label;
-  const confidence = Number(props.confidence);
-  const addressParts = overtureAddressParts(props);
   const distanceMeters = distanceFrom ? haversineMeters(distanceFrom, [lng, lat]) : null;
   return {
     type: 'Feature', id,
@@ -425,16 +410,8 @@ function normalizeFeature(feature, distanceFrom = null, knownClassification = nu
       subcategoryLabel: classification?.subcategoryLabel || category.label,
       short: category.short, color: category.color,
       website: firstWebsite(props),
-      phones: safeJson(props.phones, []), emails: safeJson(props.emails, []), socials: safeJson(props.socials, []),
-      address: bestAddress(props), locality: addressParts.locality, postcode: addressParts.postcode, status: statusLabel(props),
-      confidence: Number.isFinite(confidence) ? confidence : null,
       sources: sourceDatasets(props).join(', '),
-      overtureId: props.id || '',
       categoryBasis: classification?.basis || 'taxonomy',
-      categoryReason: classification?.reason || '',
-      categoryScore: Number.isFinite(Number(classification?.score)) ? Number(classification.score) : null,
-      categoryConfidence: classification?.categoryConfidence || '',
-      entityType: classification?.entityType || '',
       distanceMeters: Number.isFinite(distanceMeters) ? distanceMeters : null
     }
   };
@@ -443,12 +420,13 @@ function normalizeFeature(feature, distanceFrom = null, knownClassification = nu
 function filteredFeatures() {
   const query = ($('#business-search').value || '').trim().toLocaleLowerCase('sv-SE');
   return state.visibleFeatures.filter(feature => {
+    if (isSuppressedListing(feature)) return false;
     const p = feature.properties;
     const categoryKeys = Array.isArray(p.categoryKeys) ? p.categoryKeys : [p.categoryKey].filter(Boolean);
     if (!categoryKeys.some(key => state.selectedCategories.has(key))) return false;
     if (!query) return true;
     const secondary = Array.isArray(p.secondaryCategoryLabels) ? p.secondaryCategoryLabels.join(' ') : '';
-    return `${p.name} ${p.categoryLabel} ${p.subcategoryLabel || ''} ${secondary} ${p.address}`.toLocaleLowerCase('sv-SE').includes(query);
+    return `${p.name} ${p.categoryLabel} ${p.subcategoryLabel || ''} ${secondary}`.toLocaleLowerCase('sv-SE').includes(query);
   });
 }
 
@@ -628,7 +606,7 @@ function updateResultList(features = filteredFeatures()) {
     li.innerHTML = `
       <button class="result-card${state.selectedFeatureId === String(feature.id) ? ' is-map-selected' : ''}" data-id="${text(feature.id)}" aria-pressed="${String(state.selectedFeatureId === String(feature.id))}" aria-label="Visa ${text(p.name)} på kartan">
         <span class="result-symbol" style="--cat:${text(p.color)}">${text(p.short)}</span>
-        <span class="result-copy"><strong>${text(p.name)}</strong><small class="result-meta">${text(p.subcategoryLabel || p.categoryLabel)}${distance ? `<span class="result-distance">${text(distance.replace(' · ', ''))}</span>` : ''}</small>${p.address ? `<small class="result-address">${text(p.address)}</small>` : ''}</span>
+        <span class="result-copy"><strong>${text(p.name)}</strong><small class="result-meta">${text(p.subcategoryLabel || p.categoryLabel)}${distance ? `<span class="result-distance">${text(distance.replace(' · ', ''))}</span>` : ''}</small></span>
         <span class="result-chevron" aria-hidden="true">›</span>
       </button>`;
     fragment.append(li);
@@ -681,54 +659,25 @@ function safeWebsiteUrl(value) {
   } catch { return null; }
 }
 
-function firstSafeTelephone(raw) {
-  const list = Array.isArray(raw) ? raw : safeJson(raw, []);
-  const entries = Array.isArray(list) ? list : [list];
-  for (const entry of entries) {
-    const value = String(entry?.number || entry?.phone || entry || '').trim();
-    if (/^\+?[0-9() .-]{6,24}$/.test(value) && value.replace(/\D/g, '').length >= 6) {
-      return {display: value, link: value.replace(/[^0-9+]/g, '')};
-    }
-  }
-  return null;
-}
-function firstSafeEmail(raw) {
-  const list = Array.isArray(raw) ? raw : safeJson(raw, []);
-  const entries = Array.isArray(list) ? list : [list];
-  return entries.map(v => String(v?.email || v || '').trim())
-    .find(v => /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(v) && v.length <= 180) || '';
-}
-function firstSafeSocial(raw) {
-  const list = Array.isArray(raw) ? raw : safeJson(raw, []);
-  const entries = Array.isArray(list) ? list : [list];
-  return entries.map(v => safeWebsiteUrl(v?.url || v)).find(Boolean) || '';
-}
 function showPopup(feature, lngLat) {
   const p = feature.properties || {};
   const website = safeWebsiteUrl(p.website);
-  const phone = firstSafeTelephone(p.phones);
-  const email = firstSafeEmail(p.emails);
-  const social = firstSafeSocial(p.socials);
   const distance = Number.isFinite(p.distanceMeters) ? formatDistance(p.distanceMeters) : '';
   const coordinates = feature.geometry?.coordinates || [];
-  const mapLink = Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1])
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${coordinates[1]},${coordinates[0]}`)}` : '';
-  const secondary = Array.isArray(p.secondaryCategoryLabels)
-    ? [...new Set(p.secondaryCategoryLabels)].filter(Boolean).filter(x => x !== p.subcategoryLabel).slice(0,4) : [];
+  const coordinateText = Number.isFinite(coordinates[0]) && Number.isFinite(coordinates[1])
+    ? `${coordinates[1].toFixed(5)}, ${coordinates[0].toFixed(5)}` : '';
   const categoryBasis = p.categoryBasis === 'profile' ? 'företagsprofil och kategori'
     : p.categoryBasis === 'name' ? 'företagsnamn och kategori' : 'Overtures kategorier';
-  const extraLinks = [
-    phone ? `<a class="popup-link-item" href="tel:${text(phone.link)}">Ring: ${text(phone.display)}</a>` : '',
-    email ? `<a class="popup-link-item" href="mailto:${text(email)}">E-post: ${text(email)}</a>` : '',
-    mapLink ? `<a class="popup-link-item" href="${text(mapLink)}" target="_blank" rel="noopener noreferrer">Visa platsen i karttjänst ↗</a>` : '',
-    social ? `<a class="popup-link-item" href="${text(social)}" target="_blank" rel="noopener noreferrer nofollow">Sociala medier ↗</a>` : ''
-  ].filter(Boolean).join('');
-  const sourceInfo = `<p>Företagsuppgifter från Overture Places ${text(state.activeOvertureRelease || CONFIG.overtureRelease)}.</p>
-    ${p.sources ? `<p>Underliggande källor: ${text(p.sources)}.</p>` : ''}
-    <p>Kategorisering: ${text(categoryBasis)}. Värden från källdatan är inte kontrollerade av Hantverkarkartan.</p>
-    ${Number.isFinite(p.confidence) ? `<p>Existenssignal i källdatan: ${text(Math.round(p.confidence * 100))}/100. Detta är inte ett kundbetyg, en tjänstekontroll eller en garanti.</p>` : ''}
+  const sourceInfo = `<p>Företagsuppgifternas källa är Overture Maps Places ${text(state.activeOvertureRelease || CONFIG.overtureRelease)}.</p>
+    ${p.sources ? `<p>Dataleverantörer: ${text(p.sources)}.</p>` : ''}
+    <p>Urval och kategorisering: ${text(categoryBasis)}. Källuppgifterna är inte individuellt verifierade.</p>
     <a href="${text(CONFIG.overturePlacesDocsUrl)}" target="_blank" rel="noopener noreferrer">Om Overture Places ↗</a>
-    <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera datafel ↗</a>`;
+    <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera källdatafel till Overture ↗</a>
+    <a href="mailto:${text(CONFIG.operator.contactEmail)}?subject=${encodeURIComponent('Rättelse eller invändning – Hantverkarkartan')}">Begär rättelse hos oss ↗</a>
+    <p>Referens för rättelse: ${text(feature.id || 'saknas')}</p>`;
+  const websiteLink = website
+    ? `<a href="${text(website)}" target="_blank" rel="noopener noreferrer nofollow" title="Extern webbplats från Overture, ej kontrollerad">Besök webbplats ↗</a>`
+    : '<span class="popup-no-site">Ingen webbplats angiven</span>';
   const html = `
     <article class="popup-card">
       <div class="popup-mobile-head"><span class="popup-mobile-grip" aria-hidden="true"></span></div>
@@ -736,29 +685,21 @@ function showPopup(feature, lngLat) {
       <h2>${text(p.name)}</h2>
       <div class="popup-mobile-summary">
         <div class="popup-mobile-service">${text(p.subcategoryLabel || p.categoryLabel || 'Ej specificerad')}</div>
-        <div class="popup-mobile-meta"><span>${p.address ? text(p.address) : 'Adress saknas'}</span>${distance ? `<strong>${text(distance)} bort</strong>` : ''}</div>
+        <div class="popup-mobile-meta"><span>${coordinateText ? text(coordinateText) : 'Koordinater saknas'}</span>${distance ? `<strong>${text(distance)} bort</strong>` : ''}</div>
       </div>
-      <button class="popup-more-toggle" type="button" aria-expanded="false">Visa fler uppgifter <span aria-hidden="true">⌄</span></button>
+      <button class="popup-more-toggle" type="button" aria-expanded="false">Om datakällan <span aria-hidden="true">⌄</span></button>
       <div class="popup-scroll">
-      <div class="popup-overview">
-        <div class="popup-key-info"><span>Typ av verksamhet</span><strong>${text(p.subcategoryLabel || p.categoryLabel || 'Ej specificerad')}</strong></div>
-        ${p.entityType ? `<div class="popup-key-info"><span>Inriktning</span><strong>${text(entityTypeLabel(p.entityType))}</strong></div>` : ''}
-        <div class="popup-key-info"><span>Adress enligt Overture</span><strong>${p.address ? text(p.address) : 'Gatuadress saknas i källdatan'}</strong></div>
-        ${distance ? `<div class="popup-key-info"><span>Fågelvägsavstånd</span><strong>${text(distance)} från sökpunkten</strong></div>` : ''}
-        <div class="popup-key-info"><span>Status i källdatan</span><strong>${p.status && p.status !== 'Verksamhetsstatus saknas' ? `${text(p.status)} (ej livekontrollerat)` : 'Ej tillgänglig – kontrollera själv'}</strong></div>
+        <div class="popup-overview">
+          <div class="popup-key-info"><span>Kategori</span><strong>${text(p.subcategoryLabel || p.categoryLabel || 'Ej specificerad')}</strong></div>
+          <div class="popup-key-info"><span>Koordinater (lat, lon)</span><strong>${text(coordinateText || '—')}</strong></div>
+          ${distance ? `<div class="popup-key-info"><span>Fågelvägsavstånd</span><strong>${text(distance)}</strong></div>` : ''}
+        </div>
+        <div class="popup-actions popup-actions-desktop">${websiteLink}</div>
+        <p class="popup-hint"><strong>Observera:</strong> En kartträff är inte en rekommendation eller företagskontroll. Kontrollera företaget före beställning.</p>
+        <p class="popup-source-line"><strong>Källa: Overture Maps Places.</strong> Urval och kategorisering görs av Hantverkarkartan. <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera datafel ↗</a></p>
+        <details><summary>Källor och urval</summary>${sourceInfo}</details>
       </div>
-      ${secondary.length ? `<p class="popup-secondary"><strong>Andra relevanta områden:</strong> ${secondary.map(text).join(' · ')}</p>` : ''}
-      <div class="popup-actions popup-actions-desktop">${website
-        ? `<a href="${text(website)}" target="_blank" rel="noopener noreferrer nofollow" title="Extern webbplats från Overture, ej kontrollerad">Besök webbplats ↗</a>`
-        : (mapLink ? `<a href="${text(mapLink)}" target="_blank" rel="noopener noreferrer">Visa på karta ↗</a>` : '<span class="popup-no-site">Ingen webbplats angiven</span>')}</div>
-      ${extraLinks ? `<div class="popup-contact">${extraLinks}</div>` : ''}
-      <p class="popup-hint"><strong>Att tänka på:</strong> detta är en kartträff, inte en rekommendation eller kvalitetskontroll. Kontrollera tjänster, behörigheter, försäkring och kontaktuppgifter före beställning.</p>
-      <p class="popup-source-line"><strong>Källa: Overture Maps Places.</strong> Hantverkarkartan visar uppgifterna utan egen företagsgranskning. <a href="${text(CONFIG.reportIssueUrl)}" target="_blank" rel="noopener noreferrer">Rapportera fel till Overture ↗</a></p>
-      <details><summary>Mer om datakällan och urvalet</summary>${sourceInfo}</details>
-      </div>
-      <div class="popup-actions popup-actions-mobile">${website
-        ? `<a href="${text(website)}" target="_blank" rel="noopener noreferrer nofollow" title="Extern webbplats från Overture, ej kontrollerad">Besök webbplats ↗</a>`
-        : (mapLink ? `<a href="${text(mapLink)}" target="_blank" rel="noopener noreferrer">Visa på karta ↗</a>` : '<span class="popup-no-site">Ingen webbplats angiven</span>')}</div>
+      <div class="popup-actions popup-actions-mobile">${websiteLink}</div>
     </article>`;
   // Mobile: keep the company card OUTSIDE the MapLibre map canvas. An anchored
   // popup was clipped by the map/sidebar stacking contexts on real Android.
@@ -787,7 +728,7 @@ function showPopup(feature, lngLat) {
     more.addEventListener('click', () => {
       const expanded = overlay.querySelector('.popup-card').classList.toggle('is-expanded');
       more.setAttribute('aria-expanded', String(expanded));
-      more.innerHTML = expanded ? 'Visa färre uppgifter <span aria-hidden="true">⌃</span>' : 'Visa fler uppgifter <span aria-hidden="true">⌄</span>';
+      more.innerHTML = expanded ? 'Dölj datakällan <span aria-hidden="true">⌃</span>' : 'Om datakällan <span aria-hidden="true">⌄</span>';
     });
     return;
   }
@@ -1229,6 +1170,7 @@ function addNormalizedFeatures(rawFeatures, center, radiusMeters, dedupe) {
       if (!Number.isFinite(normalized.properties.distanceMeters)) continue;
       if (normalized.properties.distanceMeters > radiusMeters + 0.5) continue;
     }
+    if (isSuppressedListing(normalized)) continue;
     const key = String(normalized.id);
     if (!dedupe.has(key)) dedupe.set(key, normalized);
   }
